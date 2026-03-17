@@ -82,20 +82,14 @@ app.renderPag = (containerId, page, pages, total, onPrev, onNext) => {
 // ─── FIREBASE / LOCAL ─────────────────────────────────────────────────────────
 
 app.init = () => {
-    if (!window.auth) {
-        app.loadLocal();
-        app.show('app-view', true);
-        app.navigate('orcamentos');
-        return;
-    }
     app.el('login-form').addEventListener('submit', app.handleLogin);
+
     auth.onAuthStateChanged(async user => {
         if (user) {
             ui.userId = user.uid;
             ui.userDocRef = db.collection('clinicas_v7').doc(user.uid);
-            app.show('loading-view', true);
             app.hide('login-view');
-            // Carregar perfil do usuário
+            app.show('loading-view', true);
             await app.loadPerfil(user.uid);
             await app.loadData();
             app.hide('loading-view');
@@ -168,18 +162,46 @@ app.loadLocal = () => {
 app.saveLocal = () => { try { localStorage.setItem('tm7', JSON.stringify(appData)); } catch(e){} };
 
 app.loadData = async () => {
-    try { const doc=await ui.userDocRef.get(); if(doc.exists){ const d=doc.data(); appData={...appData,...d,config:{...appData.config,...(d.config||{})}}; } else { await ui.userDocRef.set(appData); } } catch(e){ app.toast('Erro ao carregar dados.','err'); }
+    try {
+        const doc = await ui.userDocRef.get();
+        if (doc.exists) {
+            const d = doc.data();
+            appData = { ...appData, ...d, config: { ...appData.config, ...(d.config || {}) } };
+        } else {
+            // Primeiro acesso: cria documento com dados padrão
+            await ui.userDocRef.set(appData);
+        }
+    } catch(e) {
+        console.error('Erro ao carregar:', e);
+        app.toast('Erro ao carregar dados.', 'err');
+    }
 };
 
 app.save = async col => {
-    if (!window.db || !ui.userDocRef) { app.saveLocal(); return; }
-    try { await ui.userDocRef.update({[col]:appData[col]}); } catch(e){ app.toast('Erro ao salvar.','err'); }
+    if (!ui.userDocRef) return;
+    try {
+        // set com merge garante que funciona mesmo se o campo não existia antes
+        await ui.userDocRef.set({ [col]: appData[col] }, { merge: true });
+    } catch(e) {
+        console.error('Erro ao salvar:', e);
+        app.toast('Erro ao salvar. Verifique as regras do Firestore.', 'err');
+    }
 };
 
 app.saveConfig = async () => {
-    appData.config = { nome:app.val('conf-nome'), logoUrl:app.val('conf-logo'), tel:app.val('conf-tel'), wpp:app.val('conf-wpp'), end1:app.val('conf-end1'), end2:app.val('conf-end2'), medico:app.val('conf-medico'), crm:app.val('conf-crm-pad') };
-    if (!window.db || !ui.userDocRef) { app.saveLocal(); app.toast('Configurações salvas!'); return; }
-    try { await ui.userDocRef.update({config:appData.config}); app.toast('Configurações salvas!'); } catch(e){ app.toast('Erro.','err'); }
+    appData.config = {
+        nome: app.val('conf-nome'), logoUrl: app.val('conf-logo'),
+        tel: app.val('conf-tel'), wpp: app.val('conf-wpp'),
+        end1: app.val('conf-end1'), end2: app.val('conf-end2')
+    };
+    if (!ui.userDocRef) return;
+    try {
+        await ui.userDocRef.set({ config: appData.config }, { merge: true });
+        app.toast('Configurações salvas!');
+    } catch(e) {
+        console.error('Erro ao salvar config:', e);
+        app.toast('Erro ao salvar configurações.', 'err');
+    }
 };
 
 // ─── NAVEGAÇÃO ────────────────────────────────────────────────────────────────
@@ -875,8 +897,8 @@ app.abrirImpressao = orcId => {
         <div class="p-header"><div>${logoH}</div><div class="p-hinfo">${hInfo}</div></div>
         <hr class="p-div">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0;">
-            <div><div style="margin-bottom:8px;"><p class="p-label">Paciente</p><p style="font-size:14px;font-weight:700;color:#013425;">${orc.paciente}</p></div><div><p class="p-label">Data</p><p style="font-size:13px;font-weight:600;">${fmtData}</p></div></div>
-            <div style="text-align:right;"><div style="margin-bottom:8px;"><p class="p-label">Médico(a)</p><p style="font-size:14px;font-weight:700;color:#013425;">${orc.medico}</p></div><div><p class="p-label">CRM</p><p style="font-size:13px;font-weight:600;">${orc.crm||'—'}</p></div></div>
+            <div><div style="margin-bottom:8px;"><p class="p-label">Paciente</p><p style="font-size:14px;font-weight:700;color:#013425;">${orc.paciente}</p></div><div><p class="p-label">Médico(a)</p><p style="font-size:13px;font-weight:600;color:#013425;">${orc.medico}</p></div></div>
+            <div style="text-align:right;"><div style="margin-bottom:8px;"><p class="p-label">Data</p><p style="font-size:14px;font-weight:700;color:#013425;">${fmtData}</p></div><div><p class="p-label">CRM</p><p style="font-size:13px;font-weight:600;">${orc.crm||'—'}</p></div></div>
         </div>
         <hr class="p-gdiv">
         <div style="margin:14px 0 10px;">
@@ -918,8 +940,8 @@ app.abrirImpressao = orcId => {
         <div class="p-header"><div>${logoH}</div><div class="p-hinfo">${hInfo}</div></div>
         <hr class="p-div">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
-            <div><div style="margin-bottom:6px;"><p class="p-label">Paciente</p><p style="font-size:13px;font-weight:700;color:#013425;">${orc.paciente}</p></div><div><p class="p-label">Data</p><p style="font-size:13px;font-weight:600;">${fmtData}</p></div></div>
-            <div style="text-align:right;"><div style="margin-bottom:6px;"><p class="p-label">Médico(a)</p><p style="font-size:13px;font-weight:700;color:#013425;">${orc.medico}</p></div><div><p class="p-label">CRM</p><p style="font-size:13px;font-weight:600;">${orc.crm||'—'}</p></div></div>
+            <div><div style="margin-bottom:6px;"><p class="p-label">Paciente</p><p style="font-size:13px;font-weight:700;color:#013425;">${orc.paciente}</p></div><div><p class="p-label">Médico(a)</p><p style="font-size:13px;font-weight:600;color:#013425;">${orc.medico}</p></div></div>
+            <div style="text-align:right;"><div style="margin-bottom:6px;"><p class="p-label">Data</p><p style="font-size:13px;font-weight:700;color:#013425;">${fmtData}</p></div><div><p class="p-label">CRM</p><p style="font-size:13px;font-weight:600;">${orc.crm||'—'}</p></div></div>
         </div>
         <hr class="p-gdiv">
         <div style="text-align:center;padding:14px 0 20px;">
@@ -967,12 +989,6 @@ app.populateConfig=()=>{
     app.setVal('conf-nome',c.nome); app.setVal('conf-logo',c.logoUrl); app.setVal('conf-tel',c.tel);
     app.setVal('conf-wpp',c.wpp); app.setVal('conf-end1',c.end1); app.setVal('conf-end2',c.end2);
     app.renderMedicos();
-};
-
-app.saveConfig = async () => {
-    appData.config = { nome:app.val('conf-nome'), logoUrl:app.val('conf-logo'), tel:app.val('conf-tel'), wpp:app.val('conf-wpp'), end1:app.val('conf-end1'), end2:app.val('conf-end2') };
-    if (!window.db || !ui.userDocRef) { app.saveLocal(); app.toast('Configurações salvas!'); return; }
-    try { await ui.userDocRef.update({config:appData.config}); app.toast('Configurações salvas!'); } catch(e){ app.toast('Erro.','err'); }
 };
 
 // ─── MÉDICOS ──────────────────────────────────────────────────────────────────
