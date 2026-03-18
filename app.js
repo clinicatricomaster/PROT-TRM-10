@@ -24,6 +24,7 @@ let ui = {
     modalTipo: 'avulso',
     modalOrcTipo: 'avulso',
     orcTab: 'protocolo',        // 'protocolo' | 'itens'
+    protoTab: 'fases',          // 'fases' | 'avulso'
     faseEditandoId: null,
     orcFaseEditandoId: null,
     kitEmEdicao: [],
@@ -113,7 +114,6 @@ app.handleLogin = e => {
 };
 
 app.handleLogout = () => {
-    if (!window.auth) return app.toast('Modo local — sem logout.', 'ok');
     if (confirm('Sair do sistema?')) auth.signOut();
 };
 
@@ -156,10 +156,6 @@ app.aplicarRestricaoPerfil = () => {
     }
 };
 
-app.loadLocal = () => {
-    try { const s=localStorage.getItem('tm7'); if(s){ const d=JSON.parse(s); appData={...appData,...d,config:{...appData.config,...(d.config||{})}}; } } catch(e){}
-};
-app.saveLocal = () => { try { localStorage.setItem('tm7', JSON.stringify(appData)); } catch(e){} };
 
 app.loadData = async () => {
     try {
@@ -349,24 +345,32 @@ app.renderKits = () => {
     const empty=app.el('kit-empty'), lista_el=app.el('kit-lista');
     if(lista.length===0){ empty.style.display='block'; lista_el.innerHTML=''; app.hide('kit-pag'); return; }
     empty.style.display='none';
-    lista_el.innerHTML=items.map(k=>`
-        <div style="border:1px solid #e8ece9;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                <div style="flex:1;">
-                    <p style="font-weight:700;color:#013425;font-size:14px;margin-bottom:4px;">${k.nome}</p>
-                    <div style="font-size:12px;color:#888;">${k.itens.map(i=>`${i.qtd}x ${i.nome}`).join(' · ')}</div>
-                </div>
-                <div style="text-align:right;margin-left:16px;flex-shrink:0;">
-                    ${k.descPerc>0||k.descValor>0?`<p style="font-size:11px;color:#bbb;text-decoration:line-through;">${app.fmt(k.valorOriginal)}</p>`:''}
-                    <p style="font-size:16px;font-weight:700;color:#C5A365;">${app.fmt(k.valorFinal)}</p>
-                    ${k.descPerc>0?`<span class="pill pill-gold">${k.descPerc.toFixed(1)}% off</span>`:''}
-                </div>
-            </div>
-            <div style="display:flex;gap:5px;margin-top:10px;justify-content:flex-end;">
-                <button onclick="app.editKit('${k.id}')" class="btn-icon" title="Editar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-                <button onclick="app.deleteKit('${k.id}')" class="btn-icon btn-danger" title="Excluir"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg></button>
-            </div>
-        </div>`).join('');
+    lista_el.innerHTML=`
+        <table class="data-table">
+            <thead><tr>
+                <th>Nome</th>
+                <th>Itens</th>
+                <th style="text-align:right;">Valor</th>
+                <th style="text-align:center;width:80px;">Ações</th>
+            </tr></thead>
+            <tbody>${items.map(k=>`
+                <tr>
+                    <td style="font-weight:600;color:#013425;white-space:nowrap;">${k.nome}</td>
+                    <td style="font-size:12px;color:#888;">${k.itens.map(i=>`${i.qtd}x ${i.nome}`).join(' · ')}</td>
+                    <td style="text-align:right;white-space:nowrap;">
+                        ${k.descPerc>0||k.descValor>0?`<span style="font-size:11px;color:#bbb;text-decoration:line-through;display:block;">${app.fmt(k.valorOriginal)}</span>`:''}
+                        <span style="font-weight:700;color:#C5A365;">${app.fmt(k.valorFinal)}</span>
+                        ${k.descPerc>0?`<span class="pill pill-gold" style="display:block;margin-top:2px;">${k.descPerc.toFixed(1)}% off</span>`:''}
+                    </td>
+                    <td style="text-align:center;">
+                        <div style="display:flex;justify-content:center;gap:2px;">
+                            <button onclick="app.editKit('${k.id}')" class="btn-icon" title="Editar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                            <button onclick="app.deleteKit('${k.id}')" class="btn-icon btn-danger" title="Excluir"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg></button>
+                        </div>
+                    </td>
+                </tr>`).join('')}
+            </tbody>
+        </table>`;
     app.renderPag('kit-pag',page,pages,total,"app.kitPagePrev()","app.kitPageNext()");
 };
 app.kitPagePrev=()=>{ ui.kitPage--; app.renderKits(); };
@@ -400,7 +404,11 @@ app.renderProtocoloList = () => {
 app.protoPagePrev=()=>{ ui.protoPage--; app.renderProtocoloList(); };
 app.protoPageNext=()=>{ ui.protoPage++; app.renderProtocoloList(); };
 
-app.novoProtocolo = () => { ui.protocoloEmEdicao={id:null,nome:'',desc:'',indicacao:'',beneficios:'',fases:[],descPerc:0,descValor:0,valorBruto:0,valorFinal:0}; app.abrirEditorProtocolo('Novo Protocolo'); };
+app.novoProtocolo = () => {
+    ui.protocoloEmEdicao={id:null,nome:'',desc:'',indicacao:'',beneficios:'',fases:[],descPerc:0,descValor:0,valorBruto:0,valorFinal:0};
+    ui.protoTab = 'fases'; // sempre inicia em fases
+    app.abrirEditorProtocolo('Novo Protocolo');
+};
 app.editProtocolo = id => { const p=appData.protocolos.find(x=>x.id===id); if(!p) return; ui.protocoloEmEdicao=JSON.parse(JSON.stringify(p)); app.abrirEditorProtocolo('Editando Protocolo'); };
 app.copiarProtocolo = id => {
     const p=appData.protocolos.find(x=>x.id===id); if(!p) return;
@@ -412,13 +420,46 @@ app.copiarProtocolo = id => {
 app.deleteProtocolo = async id => { if(!confirm('Excluir protocolo?')) return; appData.protocolos=appData.protocolos.filter(p=>p.id!==id); app.renderProtocoloList(); await app.save('protocolos'); app.toast('Excluído.'); };
 app.voltarProtocoloList = () => app.renderProtocoloList();
 
+app.switchProtoTab = (tab) => {
+    ui.protoTab = tab;
+    const isFases = tab === 'fases';
+    const btnF = app.el('proto-tab-fases-btn'), btnA = app.el('proto-tab-avulso-btn');
+    const panelF = app.el('proto-panel-fases'), panelA = app.el('proto-panel-avulso');
+    if (!btnF) return;
+    btnF.style.background = isFases ? '#fff' : 'transparent';
+    btnF.style.color = isFases ? '#013425' : '#888';
+    btnF.style.boxShadow = isFases ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
+    btnA.style.background = !isFases ? '#fff' : 'transparent';
+    btnA.style.color = !isFases ? '#013425' : '#888';
+    btnA.style.boxShadow = !isFases ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
+    if (panelF) panelF.style.display = isFases ? 'block' : 'none';
+    if (panelA) panelA.style.display = !isFases ? 'block' : 'none';
+    app.renderFases();
+};
+
+// Modo itens avulsos no protocolo: usa fase oculta livre
+app.openModalProtoItemAvulso = () => {
+    if (!ui.protocoloEmEdicao.fases) ui.protocoloEmEdicao.fases = [];
+    let faseAvulsa = ui.protocoloEmEdicao.fases.find(f => f.livre);
+    if (!faseAvulsa) {
+        faseAvulsa = { id: app.uid(), nome: 'Itens Avulsos', itens: [], livre: true };
+        ui.protocoloEmEdicao.fases.push(faseAvulsa);
+    }
+    app.openModalFaseItem(faseAvulsa.id);
+};
+
 app.abrirEditorProtocolo = titulo => {
     app.hide('proto-list-view'); app.show('proto-editor-view');
     app.el('proto-editor-titulo').textContent=titulo;
     const p=ui.protocoloEmEdicao;
     app.setVal('pe-nome',p.nome); app.setVal('pe-desc',p.desc||''); app.setVal('pe-indicacao',p.indicacao||''); app.setVal('pe-beneficios',p.beneficios||'');
     app.setVal('pe-desc-perc',p.descPerc||''); app.setVal('pe-desc-valor',p.descValor||'');
-    app.renderFases();
+    // Definir tab: se tem fase livre sem fases normais → itens avulsos
+    const temFaseNormal = p.fases.some(f => !f.livre);
+    const temFaseLivre = p.fases.some(f => f.livre);
+    const tabInicial = (!temFaseNormal && temFaseLivre) ? 'avulso' : 'fases';
+    ui.protoTab = tabInicial;
+    app.switchProtoTab(tabInicial);
 };
 
 app.adicionarFase = () => {
@@ -428,12 +469,47 @@ app.adicionarFase = () => {
 };
 
 app.renderFases = () => {
-    const c=app.el('pe-fases-lista'), fases=ui.protocoloEmEdicao.fases;
-    if(!fases.length){ c.innerHTML='<div class="empty-state" style="padding:20px;">Nenhuma fase</div>'; app.atualizarResumoProto(); return; }
-    c.innerHTML=fases.map((fase,fi)=>{
-        const sub=fase.itens.reduce((s,i)=>s+i.valorUnit*i.qtd,0);
-        const itensHtml=fase.itens.length===0?'<p style="font-size:12px;color:#bbb;font-style:italic;">Sem itens</p>':
-            fase.itens.map((item,ii)=>`
+    const c = app.el('pe-fases-lista');
+    const fases = ui.protocoloEmEdicao.fases;
+
+    // MODO ITENS AVULSOS — lista plana sem cabeçalho de fase
+    if (ui.protoTab === 'avulso') {
+        const faseLivre = fases.find(f => f.livre);
+        const itens = faseLivre ? faseLivre.itens : [];
+        if (itens.length === 0) { c.innerHTML = ''; app.atualizarResumoProto(); return; }
+        const total = itens.reduce((s,i) => s + i.valorUnit * i.qtd, 0);
+        c.innerHTML = `
+            <div style="border-top:1px solid #f0f0f0;padding-top:12px;margin-top:4px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                    <span style="font-size:12px;font-weight:700;color:#013425;">${itens.length} item(s)</span>
+                    <span style="font-size:13px;font-weight:700;color:#C5A365;">${app.fmt(total)}</span>
+                </div>
+                ${itens.map((item,ii) => `
+                    <div class="item-row is-normal">
+                        <div style="flex:1;font-size:13px;">
+                            <strong>${item.qtd}x</strong> ${item.nome}
+                            ${item.tipo==='kit'?'<span class="pill pill-gold">Kit</span>':''}
+                            <span style="color:#888;">${app.fmt(item.valorUnit*item.qtd)}</span>
+                        </div>
+                        <div style="display:flex;gap:3px;">
+                            <button onclick="app.chgFaseItemAvulso(${ii},-1)" class="btn-icon" style="width:24px;height:24px;border:1px solid #eee;border-radius:5px;">−</button>
+                            <button onclick="app.chgFaseItemAvulso(${ii},1)" class="btn-icon" style="width:24px;height:24px;border:1px solid #eee;border-radius:5px;">+</button>
+                            <button onclick="app.removeFaseItemAvulso(${ii})" class="btn-icon btn-danger"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                        </div>
+                    </div>`).join('')}
+            </div>`;
+        app.atualizarResumoProto();
+        return;
+    }
+
+    // MODO FASES — exibe fases com cabeçalho (ignora fases livres)
+    const fasesNormais = fases.filter(f => !f.livre);
+    if (!fasesNormais.length) { c.innerHTML = '<div class="empty-state" style="padding:20px;">Nenhuma fase adicionada</div>'; app.atualizarResumoProto(); return; }
+    c.innerHTML = fasesNormais.map((fase, fi) => {
+        const sub = fase.itens.reduce((s,i) => s + i.valorUnit * i.qtd, 0);
+        const itensHtml = fase.itens.length === 0
+            ? '<p style="font-size:12px;color:#bbb;font-style:italic;">Sem itens</p>'
+            : fase.itens.map((item,ii) => `
                 <div class="item-row is-normal">
                     <div style="flex:1;font-size:13px;"><strong>${item.qtd}x</strong> ${item.nome}${item.tipo==='kit'?' <span class="pill pill-gold">Kit</span>':''} <span style="color:#888;">${app.fmt(item.valorUnit*item.qtd)}</span></div>
                     <div style="display:flex;gap:3px;">
@@ -465,6 +541,9 @@ app.renameFase=(faseId,nome)=>{ const f=ui.protocoloEmEdicao.fases.find(x=>x.id=
 app.deleteFase=faseId=>{ if(!confirm('Excluir fase?')) return; ui.protocoloEmEdicao.fases=ui.protocoloEmEdicao.fases.filter(f=>f.id!==faseId); app.renderFases(); };
 app.chgFaseQtd=(faseId,ii,d)=>{ const f=ui.protocoloEmEdicao.fases.find(x=>x.id===faseId); if(f) f.itens[ii].qtd=Math.max(1,f.itens[ii].qtd+d); app.renderFases(); };
 app.removeFaseItem=(faseId,ii)=>{ const f=ui.protocoloEmEdicao.fases.find(x=>x.id===faseId); if(f) f.itens.splice(ii,1); app.renderFases(); };
+// Helpers modo avulso no protocolo
+app.chgFaseItemAvulso=(ii,d)=>{ const f=ui.protocoloEmEdicao.fases.find(x=>x.livre); if(f) f.itens[ii].qtd=Math.max(1,f.itens[ii].qtd+d); app.renderFases(); };
+app.removeFaseItemAvulso=ii=>{ const f=ui.protocoloEmEdicao.fases.find(x=>x.livre); if(f){ f.itens.splice(ii,1); app.renderFases(); } };
 
 app.atualizarResumoProto = () => {
     const fases=ui.protocoloEmEdicao.fases;
@@ -564,6 +643,7 @@ app.orcPageNext=()=>{ ui.orcPage++; app.renderOrcamentoList(); };
 
 app.novoOrcamento = () => {
     ui.orcamentoEmEdicao={id:null,paciente:'',medicoId:'',medico:'',crm:'',data:new Date().toISOString().slice(0,10),protocoloId:null,protocoloNome:'',fases:[],valorBruto:0,valorCortesias:0,valorProtocolo:0,descAvista:0,descParcelado:0,numParcelas:1,valorAvista:0,valorParcelado:0};
+    ui.orcTab = 'protocolo'; // sempre inicia em protocolo
     app.abrirEditorOrcamento('Novo Orçamento');
 };
 
@@ -571,6 +651,10 @@ app.editOrcamento = id => {
     const o=appData.orcamentos.find(x=>x.id===id); if(!o) return;
     ui.orcamentoEmEdicao=JSON.parse(JSON.stringify(o));
     if(!ui.orcamentoEmEdicao.fases) ui.orcamentoEmEdicao.fases=[];
+    // detectar tab: se tem só fase livre → itens avulsos
+    const temFaseNormal = ui.orcamentoEmEdicao.fases.some(f=>!f.livre);
+    const temFaseLivre  = ui.orcamentoEmEdicao.fases.some(f=>f.livre);
+    ui.orcTab = (!temFaseNormal && temFaseLivre) ? 'itens' : 'protocolo';
     app.abrirEditorOrcamento(`Editando #${id}`);
 };
 
@@ -849,48 +933,102 @@ app.gerarIdOrc=()=>{ const d=new Date(),y=d.getFullYear(),m=String(d.getMonth()+
 // ─── IMPRESSÃO ────────────────────────────────────────────────────────────────
 
 app.abrirImpressao = orcId => {
+    try {
     const orc=appData.orcamentos.find(o=>o.id===orcId); if(!orc) return app.toast('Orçamento não encontrado.','err');
     const cfg=appData.config;
     // [5] Logo 25% maior: max-height 55→69px, max-width 150→188px
     const logoH=cfg.logoUrl?`<img src="${cfg.logoUrl}" style="max-height:69px;max-width:188px;object-fit:contain;" alt="Logo">`:`<strong style="font-size:18px;color:#013425;">${cfg.nome}</strong>`;
     const hInfo=`<strong>${cfg.nome}</strong><br>${cfg.end1}<br>${cfg.end2}<br>Tel: ${cfg.tel} · WhatsApp: ${cfg.wpp}`;
     const fmtData=new Date(orc.data+'T12:00:00').toLocaleDateString('pt-BR');
-    const fases=orc.fases||[];
-    const parc=orc.numParcelas||1;
-    const parcVal=orc.valorParcelado/parc;
-    const liquido=(orc.valorBruto||0)-(orc.valorCortesias||0);
 
-    // [1] Buscar desc/indicacao/beneficios do protocolo original
+    // Protocolo original — para desc/indicacao/beneficios e fallback de fases
     const protoOrig=orc.protocoloId?appData.protocolos.find(p=>p.id===orc.protocoloId):null;
     const descricao=protoOrig&&protoOrig.desc?protoOrig.desc:'';
     const indicacao=protoOrig&&protoOrig.indicacao?protoOrig.indicacao:'';
     const beneficios=protoOrig&&protoOrig.beneficios?protoOrig.beneficios:'';
 
+    // Se o orçamento não tem fases salvas (criado antes da v7),
+    // usar as fases do protocolo original como fallback
+    let fases = orc.fases || [];
+    if (fases.length === 0 && protoOrig && protoOrig.fases && protoOrig.fases.length > 0) {
+        fases = JSON.parse(JSON.stringify(protoOrig.fases)).map(f => ({
+            ...f, livre: false, itens: f.itens.map(i => ({...i, cortesia: false}))
+        }));
+    }
+
+    const parc = orc.numParcelas || 1;
+    const parcVal = (orc.valorParcelado || 0) / parc;
+    const liquido = (orc.valorBruto || 0) - (orc.valorCortesias || 0);
+
     let fasesHtml='', tabelaRows='';
-    fases.forEach((fase,fi)=>{
-        const sub=fase.itens.reduce((s,i)=>s+(i.cortesia?0:i.valorUnit*i.qtd),0);
-        const itensHtml=fase.itens.map(item=>{
-            // [2] Kit sub-itens em linha única separados por ·
-            let kitInlineHtml='';
-            if(item.tipo==='kit'){
-                const kit=appData.kits.find(k=>k.id===item.refId);
-                if(kit&&kit.itens){
-                    const partes=kit.itens.map(ki=>`${ki.qtd*item.qtd}x ${ki.nome}`).join(' · ');
-                    kitInlineHtml=`<span style="font-size:11px;color:#888;margin-left:6px;">↳ ${partes}</span>`;
+    const fasesNormais = fases.filter(f => !f.livre);
+    const faseAvulsa  = fases.find(f => f.livre);
+
+    // Fases do protocolo
+    fasesNormais.forEach((fase, fi) => {
+        const sub = fase.itens.reduce((s,i) => s + (i.cortesia ? 0 : i.valorUnit * i.qtd), 0);
+        const itensHtml = fase.itens.map(item => {
+            let kitInlineHtml = '';
+            if (item.tipo === 'kit') {
+                const kit = appData.kits.find(k => k.id === item.refId);
+                if (kit && kit.itens) {
+                    const partes = kit.itens.map(ki => `${ki.qtd * item.qtd}x ${ki.nome}`).join(' · ');
+                    kitInlineHtml = `<span style="font-size:11px;color:#888;margin-left:6px;">↳ ${partes}</span>`;
                 }
             }
             return `
                 <div class="p-item">
                     <div style="flex:1;">
-                        <span>${item.qtd}x ${item.nome}</span>
+                        <span>${item.qtd||1}x ${item.nome}</span>
                         ${kitInlineHtml}
                     </div>
                     <span style="font-weight:600;white-space:nowrap;margin-left:8px;">${item.cortesia?'Cortesia':app.fmt(item.valorUnit*item.qtd)}</span>
                 </div>`;
         }).join('');
-        fasesHtml+=`<div class="p-fase"><div class="p-fase-h"><span>Fase ${fi+1} — ${fase.nome}</span><span>${app.fmt(sub)}</span></div><div class="p-fase-b">${itensHtml||'<p style="font-size:12px;color:#bbb;">Sem itens</p>'}</div></div>`;
-        tabelaRows+=`<tr><td>Fase ${fi+1} — ${fase.nome}</td><td style="text-align:right;">${app.fmt(sub)}</td></tr>`;
+        fasesHtml += `<div class="p-fase"><div class="p-fase-h"><span>Fase ${fi+1} — ${fase.nome}</span><span>${app.fmt(sub)}</span></div><div class="p-fase-b">${itensHtml||'<p style="font-size:12px;color:#bbb;">Sem itens</p>'}</div></div>`;
+        tabelaRows += `<tr>
+            <td>
+                <strong>Fase ${fi+1} — ${fase.nome}</strong>
+                <div style="font-size:11px;color:#666;margin-top:3px;">
+                    ${fase.itens.map(item => item.tipo==='kit' ? item.nome : `${item.qtd||1}x ${item.nome}`).join(' · ')}
+                </div>
+            </td>
+            <td style="text-align:right;vertical-align:top;">${app.fmt(sub)}</td>
+        </tr>`;
     });
+
+    // Itens avulsos (sem fases)
+    if (faseAvulsa && faseAvulsa.itens.length > 0) {
+        const sub = faseAvulsa.itens.reduce((s,i) => s + (i.cortesia ? 0 : i.valorUnit * i.qtd), 0);
+        const itensHtml = faseAvulsa.itens.map(item => {
+            let kitInlineHtml = '';
+            if (item.tipo === 'kit') {
+                const kit = appData.kits.find(k => k.id === item.refId);
+                if (kit && kit.itens) {
+                    const partes = kit.itens.map(ki => `${ki.qtd * item.qtd}x ${ki.nome}`).join(' · ');
+                    kitInlineHtml = `<span style="font-size:11px;color:#888;margin-left:6px;">↳ ${partes}</span>`;
+                }
+            }
+            return `
+                <div class="p-item">
+                    <div style="flex:1;">
+                        <span>${item.qtd||1}x ${item.nome}</span>
+                        ${kitInlineHtml}
+                    </div>
+                    <span style="font-weight:600;white-space:nowrap;margin-left:8px;">${item.cortesia?'Cortesia':app.fmt(item.valorUnit*item.qtd)}</span>
+                </div>`;
+        }).join('');
+        fasesHtml += `<div class="p-fase"><div class="p-fase-h"><span>Itens do Tratamento</span><span>${app.fmt(sub)}</span></div><div class="p-fase-b">${itensHtml}</div></div>`;
+        tabelaRows += `<tr>
+            <td>
+                <strong>Itens do Tratamento</strong>
+                <div style="font-size:11px;color:#666;margin-top:3px;">
+                    ${faseAvulsa.itens.map(item => item.tipo==='kit' ? item.nome : `${item.qtd||1}x ${item.nome}`).join(' · ')}
+                </div>
+            </td>
+            <td style="text-align:right;vertical-align:top;">${app.fmt(sub)}</td>
+        </tr>`;
+    }
 
     const html=`
     <div class="print-page page-break">
@@ -953,20 +1091,17 @@ app.abrirImpressao = orcId => {
             <thead><tr><th>Fase</th><th style="text-align:right;">Valor</th></tr></thead>
             <tbody>${tabelaRows}<tr style="background:#f9fafb;font-weight:700;"><td>Total</td><td style="text-align:right;color:#013425;">${app.fmt(orc.valorProtocolo||0)}</td></tr></tbody>
         </table>
-        <div class="p-total" style="margin-top:16px;">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-                <div style="text-align:center;padding:14px;background:rgba(255,255,255,0.07);border-radius:8px;">
-                    <p style="font-size:10px;color:#C5A365;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Valor à Vista</p>
-                    <p style="font-size:22px;font-weight:700;color:#fff;">${app.fmt(orc.valorAvista)}</p>
-                    ${orc.descAvista>0?`<p style="font-size:11px;color:#a3b8b1;">${orc.descAvista}% de desconto</p>`:''}
-                </div>
-                <!-- [3] Parcelado: Total primeiro, depois parcela -->
-                <div style="text-align:center;padding:14px;background:rgba(255,255,255,0.07);border-radius:8px;">
-                    <p style="font-size:10px;color:#C5A365;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Parcelado</p>
-                    <p style="font-size:22px;font-weight:700;color:#fff;">${app.fmt(orc.valorParcelado)}</p>
-                    ${parc>1?`<p style="font-size:13px;color:#a3b8b1;margin-top:3px;">${parc}x ${app.fmt(parcVal)}</p>`:''}
-                    ${orc.descParcelado>0?`<p style="font-size:11px;color:#a3b8b1;">${orc.descParcelado}% de desconto</p>`:''}
-                </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px;">
+            <div style="text-align:center;padding:18px 16px;background:#013425;border-radius:10px;">
+                <p style="font-size:10px;color:#C5A365;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Valor à Vista</p>
+                <p style="font-size:24px;font-weight:700;color:#fff;">${app.fmt(orc.valorAvista)}</p>
+                ${orc.descAvista>0?`<p style="font-size:11px;color:#a3b8b1;margin-top:4px;">${orc.descAvista}% de desconto</p>`:''}
+            </div>
+            <div style="text-align:center;padding:18px 16px;background:#013425;border-radius:10px;">
+                <p style="font-size:10px;color:#C5A365;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Parcelado</p>
+                <p style="font-size:24px;font-weight:700;color:#fff;">${app.fmt(orc.valorParcelado)}</p>
+                ${parc>1?`<p style="font-size:13px;color:#a3b8b1;margin-top:4px;">${parc}x ${app.fmt(parcVal)}</p>`:''}
+                ${orc.descParcelado>0?`<p style="font-size:11px;color:#a3b8b1;">${orc.descParcelado}% de desconto</p>`:''}
             </div>
         </div>
         <div style="text-align:center;margin-top:30px;padding-top:16px;border-top:1px solid #eee;">
@@ -978,6 +1113,10 @@ app.abrirImpressao = orcId => {
 
     app.el('print-content').innerHTML=html;
     app.show('print-view');
+    } catch(e) {
+        console.error('Erro na impressão:', e);
+        app.toast('Erro ao gerar impressão: ' + e.message, 'err');
+    }
 };
 
 app.fecharImpressao=()=>app.hide('print-view');
