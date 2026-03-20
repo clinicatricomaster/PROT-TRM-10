@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TricoMaster Manager</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { box-sizing: border-box; }
@@ -149,13 +148,23 @@
         /* ===== PRINT ===== */
         @page { size:A4; margin:15mm; }
         @media print {
+            body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
             body > *:not(#print-view) { display:none !important; }
-            #print-view { display:block !important; position:static !important; background:#fff !important; overflow:visible !important; }
-            .print-controls { display:none !important; }
-            .page-break { page-break-after:always; }
-            body { background:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+            #print-view { display:block !important; position:static !important; inset:auto !important; overflow:visible !important; background:#fff !important; }
+            .print-controls, #bottom-nav, #sidebar, main { display:none !important; }
+            .page-break { page-break-after:always; break-after:page; }
+            .print-page { width:100% !important; margin:0 !important; padding:15mm !important; box-shadow:none !important; min-height:0 !important; background:#fff !important; }
         }
-        #print-view { font-family:'Inter',sans-serif; background:#f0f0f0; }
+        #print-view { font-family:'Inter',sans-serif; background:#f0f0f0; display:none; }
+        #print-view.active { display:block; position:fixed; inset:0; z-index:100; overflow-y:auto; }
+        #print-content { margin:0; padding:0; }
+
+        /* Quando imprimindo: esconde tudo exceto print-content */
+        body.printing #print-view { position:static !important; display:block !important; background:#fff !important; }
+        body.printing > *:not(#print-view) { display:none !important; }
+        body.printing #print-view.active { position:static !important; inset:auto !important; overflow:visible !important; }
+        body.printing .print-controls { display:none !important; }
+        body.printing .print-page { width:100% !important; margin:0 !important; box-shadow:none !important; }
         .print-page { width:210mm; min-height:297mm; margin:20px auto; background:#fff; padding:15mm; box-shadow:0 0 15px rgba(0,0,0,0.12); }
         .p-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
         .p-logo { max-height:55px; max-width:150px; object-fit:contain; }
@@ -266,7 +275,7 @@
         <section id="view-orcamentos" style="display:none;">
             <div id="orc-list-view">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
-                    <div><h1 class="section-title" style="font-size:20px;font-weight:700;color:#013425;">Orçamentos</h1><p style="font-size:13px;color:#888;">Mais recentes primeiro</p></div>
+                    <div><h1 style="font-size:20px;font-weight:700;color:#013425;">Orçamentos</h1><p style="font-size:13px;color:#888;">Mais recentes primeiro</p></div>
                     <button onclick="app.novoOrcamento()" class="btn-primary"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Novo</button>
                 </div>
                 <div class="card" style="overflow:hidden;">
@@ -479,7 +488,7 @@
                             <button onclick="app.addProcToKit()" class="btn-green"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
                         </div>
                     </div>
-                    <div id="kit-itens-list" style="margin-bottom:10px;min-height:32px;"></div>
+                    <div id="kit-itens-lista" style="margin-bottom:10px;min-height:32px;"></div>
                     <div style="background:#f9fafb;border-radius:8px;padding:12px;margin-bottom:12px;">
                         <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;"><span style="color:#888;">Valor Original:</span><span id="kit-valor-original" style="font-weight:700;color:#013425;">R$ 0,00</span></div>
                         <label class="input-label" style="margin-bottom:6px;">Desconto</label>
@@ -595,9 +604,9 @@
 </div>
 
 <!-- PRINT VIEW -->
-<div id="print-view" style="display:none;position:fixed;inset:0;z-index:100;overflow-y:auto;">
+<div id="print-view" style="display:none;">
     <div class="print-controls" style="position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:110;">
-        <button onclick="window.print()" class="btn-primary">Imprimir</button>
+        <button onclick="app.iniciarImpressao()" class="btn-primary">Imprimir</button>
         <button onclick="app.fecharImpressao()" class="btn-ghost">Fechar</button>
     </div>
     <div id="print-content"></div>
