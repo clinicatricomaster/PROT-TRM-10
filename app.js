@@ -18,7 +18,9 @@ let appData = {
 
 let ui = {
     userId: null, userDocRef: null,
-    perfil: 'admin',            // 'admin' | 'medico'
+    perfil: 'admin',
+    medicoNome: '',   // nome do médico logado (só para perfil medico)
+    medicoCrm:  '',   // CRM do médico logado            // 'admin' | 'medico'
     viewAtiva: 'orcamentos',
     tabProduto: 'avulso',
     modalTipo: 'avulso',
@@ -98,10 +100,9 @@ app.init = () => {
     auth.onAuthStateChanged(async user => {
         if (user) {
             ui.userId = user.uid;
-            ui.userDocRef = db.collection('clinicas_v7').doc(user.uid);
             app.hide('login-view');
             app.show('loading-view', true);
-            await app.loadPerfil(user.uid);
+            await app.loadPerfil(user.uid); // define ui.userDocRef + ui.perfil
             await app.loadData();
             app.hide('loading-view');
             app.el('app-view').classList.add('visible');
@@ -133,34 +134,45 @@ app.loadPerfil = async (uid) => {
     try {
         const doc = await db.collection('users').doc(uid).get();
         if (doc.exists) {
-            ui.perfil = doc.data().perfil || 'medico';
+            const data = doc.data();
+            ui.perfil    = data.perfil   || 'medico';
+            ui.medicoNome = data.nome    || '';
+            ui.medicoCrm  = data.crm     || '';
+            // Se tiver adminUid (admin ou médico), aponta para o doc da clínica principal
+            // Se não tiver (admin principal), aponta para o próprio doc
+            const docUid = data.adminUid || uid;
+            ui.userDocRef = db.collection('clinicas_v7').doc(docUid);
         } else {
-            // Primeiro acesso: cria como admin (só o primeiro usuário)
-            // Para outros usuários, crie manualmente no console do Firebase
-            ui.perfil = 'admin';
+            ui.perfil     = 'admin';
+            ui.medicoNome = '';
+            ui.medicoCrm  = '';
+            ui.userDocRef = db.collection('clinicas_v7').doc(uid);
         }
     } catch(e) {
-        console.warn('Erro ao carregar perfil, assumindo médico por segurança.');
-        ui.perfil = 'medico';
+        console.warn('Erro ao carregar perfil:', e.message);
+        // Em caso de erro assume admin para não bloquear acesso indevidamente
+        ui.perfil     = 'admin';
+        ui.medicoNome = '';
+        ui.medicoCrm  = '';
+        ui.userDocRef = db.collection('clinicas_v7').doc(uid);
     }
 };
 
 app.aplicarRestricaoPerfil = () => {
     const isMedico = ui.perfil === 'medico';
-    // Esconder itens do menu que médico não pode acessar
-    ['nav-protocolos', 'nav-produtos', 'nav-config'].forEach(id => {
+
+    // Sidebar e bottom nav
+    ['nav-protocolos', 'nav-produtos', 'nav-config',
+     'bnav-protocolos', 'bnav-produtos', 'bnav-config'].forEach(id => {
         const el = app.el(id);
         if (el) el.style.display = isMedico ? 'none' : '';
     });
-    // Médico não pode navegar para outras seções
+
     if (isMedico) {
-        // Sobrescrever navigate para bloquear
+        // Bloquear navegação para médico
         const _navigate = app.navigate.bind(app);
         app.navigate = (view) => {
-            if (view !== 'orcamentos') {
-                app.toast('Acesso restrito.', 'err');
-                return;
-            }
+            if (view !== 'orcamentos') { app.toast('Acesso restrito.', 'err'); return; }
             _navigate(view);
         };
     }
@@ -174,11 +186,10 @@ app.loadData = async () => {
             const d = doc.data();
             appData = { ...appData, ...d, config: { ...appData.config, ...(d.config || {}) } };
         } else {
-            // Primeiro acesso: cria documento com dados padrão
             await ui.userDocRef.set(appData);
         }
     } catch(e) {
-        console.error('Erro ao carregar:', e);
+        console.error('[loadData] Erro:', e);
         app.toast('Erro ao carregar dados.', 'err');
     }
 };
@@ -270,14 +281,13 @@ app.resetAvulsoForm = () => { app.setVal('avulso-id',''); app.setVal('avulso-nom
 // ─── KITS ─────────────────────────────────────────────────────────────────────
 
 app.switchProdutoTab = tab => {
-    ui.tabProduto=tab;
-    const isA=tab==='avulso';
-    app.el('tab-avulso').style.display=isA?'grid':'none';
-    app.el('tab-kit').style.display=isA?'none':'grid';
-    const bA=app.el('tab-btn-avulso'),bK=app.el('tab-btn-kit');
-    bA.style.background=isA?'#fff':'transparent'; bA.style.color=isA?'#013425':'#888'; bA.style.boxShadow=isA?'0 1px 4px rgba(0,0,0,0.1)':'none';
-    bK.style.background=!isA?'#fff':'transparent'; bK.style.color=!isA?'#013425':'#888'; bK.style.boxShadow=!isA?'0 1px 4px rgba(0,0,0,0.1)':'none';
-    if(!isA) app.populateKitSelect();
+    ui.tabProduto = tab;
+    const isA = tab === 'avulso';
+    app.el('tab-avulso').style.display = isA ? 'grid' : 'none';
+    app.el('tab-kit').style.display = isA ? 'none' : 'grid';
+    app.el('tab-btn-avulso').classList.toggle('active', isA);
+    app.el('tab-btn-kit').classList.toggle('active', !isA);
+    if (!isA) app.populateKitSelect();
 };
 
 app.populateKitSelect = () => {
@@ -295,7 +305,7 @@ app.addProcToKit = () => {
 };
 
 app.renderKitItensForm = () => {
-    const lista=app.el('kit-itens-list');
+    const lista=app.el('kit-itens-lista');
     const orig=ui.kitEmEdicao.reduce((s,i)=>s+i.valorUnit*i.qtd,0);
     lista.innerHTML=ui.kitEmEdicao.length===0?'<p style="font-size:13px;color:#bbb;text-align:center;padding:6px;">Nenhum item</p>':
         ui.kitEmEdicao.map((item,idx)=>`
@@ -441,12 +451,8 @@ app.switchProtoTab = (tab) => {
     const btnF = app.el('proto-tab-fases-btn'), btnA = app.el('proto-tab-avulso-btn');
     const panelF = app.el('proto-panel-fases'), panelA = app.el('proto-panel-avulso');
     if (!btnF) return;
-    btnF.style.background = isFases ? '#fff' : 'transparent';
-    btnF.style.color = isFases ? '#013425' : '#888';
-    btnF.style.boxShadow = isFases ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
-    btnA.style.background = !isFases ? '#fff' : 'transparent';
-    btnA.style.color = !isFases ? '#013425' : '#888';
-    btnA.style.boxShadow = !isFases ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
+    btnF.classList.toggle('active', isFases);
+    btnA.classList.toggle('active', !isFases);
     if (panelF) panelF.style.display = isFases ? 'block' : 'none';
     if (panelA) panelA.style.display = !isFases ? 'block' : 'none';
     app.renderFases();
@@ -687,23 +693,13 @@ app.switchOrcTab = (tab) => {
     const btnP = app.el('orc-tab-proto-btn'), btnI = app.el('orc-tab-itens-btn');
     const panelP = app.el('orc-panel-protocolo'), panelI = app.el('orc-panel-itens');
     if (!btnP || !btnI) return;
-    btnP.style.background = isProto ? '#fff' : 'transparent';
-    btnP.style.color = isProto ? '#013425' : '#888';
-    btnP.style.boxShadow = isProto ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
-    btnI.style.background = !isProto ? '#fff' : 'transparent';
-    btnI.style.color = !isProto ? '#013425' : '#888';
-    btnI.style.boxShadow = !isProto ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
+    btnP.classList.toggle('active', isProto);
+    btnI.classList.toggle('active', !isProto);
     if (panelP) panelP.style.display = isProto ? 'block' : 'none';
     if (panelI) panelI.style.display = !isProto ? 'block' : 'none';
     app.renderOrcFases();
 };
 
-app.addOrcFaseLivre = () => {
-    if (!ui.orcamentoEmEdicao.fases) ui.orcamentoEmEdicao.fases = [];
-    const num = ui.orcamentoEmEdicao.fases.length + 1;
-    ui.orcamentoEmEdicao.fases.push({ id: app.uid(), nome: `Fase ${num}`, itens: [], livre: true });
-    app.renderOrcFases();
-};
 
 // Modo itens livres: garante fase oculta e abre modal
 app.openModalOrcItemLivre = () => {
@@ -724,18 +720,49 @@ app.abrirEditorOrcamento = titulo => {
     app.setVal('orc-crm',o.crm); app.setVal('orc-data',o.data);
     app.setVal('orc-desc-avista',o.descAvista||''); app.setVal('orc-desc-parcelado',o.descParcelado||'');
     app.setVal('orc-parcelas',o.numParcelas||1);
-    // Popular select de médicos
-    const selMed=app.el('orc-medico');
-    if(selMed && selMed.tagName==='SELECT'){
-        selMed.innerHTML='<option value="">— Selecione o médico —</option>'+
-            [...appData.medicos].sort((a,b)=>a.nome.localeCompare(b.nome))
-                .map(m=>`<option value="${m.id}" data-crm="${m.crm}">${m.nome} — ${m.crm}</option>`).join('');
-        selMed.value=o.medicoId||'';
-        selMed.onchange=()=>{
-            const opt=selMed.options[selMed.selectedIndex];
-            app.setVal('orc-crm', opt?opt.dataset.crm||'':'');
-        };
-        if(o.medicoId){ const opt=selMed.querySelector(`option[value="${o.medicoId}"]`); if(opt) app.setVal('orc-crm',opt.dataset.crm||''); }
+    // Campo médico: fixo para médico logado, select para admin
+    const selMed = app.el('orc-medico');
+    if (ui.perfil === 'medico') {
+        // Médico só pode se vincular a si mesmo
+        // Encontrar o ID do médico na lista pelo nome
+        const medicoObj = appData.medicos.find(m =>
+            m.nome.toLowerCase() === ui.medicoNome.toLowerCase()
+        );
+        if (selMed && selMed.tagName === 'SELECT') {
+            // Substituir select por campo fixo visualmente
+            selMed.innerHTML = medicoObj
+                ? `<option value="${medicoObj.id}">${medicoObj.nome} — ${medicoObj.crm}</option>`
+                : `<option value="">${ui.medicoNome||'Médico não encontrado'}</option>`;
+            selMed.value = medicoObj ? medicoObj.id : '';
+            selMed.disabled = true;
+            selMed.style.opacity = '0.7';
+            selMed.style.cursor = 'not-allowed';
+        }
+        app.setVal('orc-crm', medicoObj ? medicoObj.crm : ui.medicoCrm);
+        if (medicoObj) {
+            ui.orcamentoEmEdicao.medicoId = medicoObj.id;
+            ui.orcamentoEmEdicao.medico   = medicoObj.nome;
+            ui.orcamentoEmEdicao.crm      = medicoObj.crm;
+        }
+    } else {
+        // Admin: select normal
+        if (selMed && selMed.tagName === 'SELECT') {
+            selMed.disabled = false;
+            selMed.style.opacity = '';
+            selMed.style.cursor = '';
+            selMed.innerHTML = '<option value="">— Selecione o médico —</option>' +
+                [...appData.medicos].sort((a,b) => a.nome.localeCompare(b.nome))
+                    .map(m => `<option value="${m.id}" data-crm="${m.crm}">${m.nome} — ${m.crm}</option>`).join('');
+            selMed.value = o.medicoId || '';
+            selMed.onchange = () => {
+                const opt = selMed.options[selMed.selectedIndex];
+                app.setVal('orc-crm', opt ? opt.dataset.crm || '' : '');
+            };
+            if (o.medicoId) {
+                const opt = selMed.querySelector(`option[value="${o.medicoId}"]`);
+                if (opt) app.setVal('orc-crm', opt.dataset.crm || '');
+            }
+        }
     }
     // Popular select de protocolos
     const sel=app.el('orc-protocolo-select');
@@ -1127,14 +1154,30 @@ app.abrirImpressao = orcId => {
     </div>`;
 
     app.el('print-content').innerHTML=html;
-    app.show('print-view');
+    const pv = app.el('print-view');
+    pv.classList.add('active');
+    pv.style.display = 'block';
     } catch(e) {
         console.error('Erro na impressão:', e);
         app.toast('Erro ao gerar impressão: ' + e.message, 'err');
     }
 };
 
-app.fecharImpressao=()=>app.hide('print-view');
+app.iniciarImpressao = () => {
+    document.body.classList.add('printing');
+    setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+            document.body.classList.remove('printing');
+        }, 500);
+    }, 100);
+};
+
+app.fecharImpressao = () => {
+    const pv = app.el('print-view');
+    pv.classList.remove('active');
+    pv.style.display = 'none';
+};
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 
